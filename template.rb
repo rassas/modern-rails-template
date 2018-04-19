@@ -85,13 +85,19 @@ def ask_optional_options
   @komponent = yes?('Do you want to adopt a component based design for your front-end?')
   @tailwind = yes?('Do you want to use Tailwind as a CSS framework?')
   @github = yes?('Do you want to push your project to Github?')
+  @rails_admin = yes?('Do you want to setup rails_admin')
 end
 
 def install_optional_gems
+  add_rails_admin if @rails_admin
   add_devise if @devise
   add_pundit if @pundit
   add_komponent if @komponent
   add_haml if @haml
+end
+
+def add_rails_admin
+  insert_into_file 'Gemfile', "\ngem 'rails_admin', '~> 1.3'\n", after: /rails-i18n'\n/
 end
 
 def add_devise
@@ -170,6 +176,12 @@ def setup_gems
   setup_devise if @devise
   setup_pundit if @pundit
   setup_haml if @haml
+
+  setup_rails_admin if @rails_admin
+end
+
+def setup_rails_admin
+  generate "rails_admin:install"
 end
 
 def setup_friendly_id
