@@ -196,6 +196,9 @@ def setup_rails_admin
     warden.authenticate! scope: :user
   end
   config.current_user_method(&:current_user)
+  config.authorize_with do
+    redirect_to main_app.root_path unless current_user.admin
+  end
       RUBY
     end
   end
@@ -281,8 +284,18 @@ def setup_devise
   mount Sidekiq::Web => '/sidekiq'
     RUBY
   end
+
   insert_into_file 'config/initializers/devise.rb', "  config.secret_key = Rails.application.credentials.secret_key_base\n", before: /^end/
-  run 'rails g devise User'
+  if @rails_admin
+    run 'rails g devise User admin:boolean'
+    # Set admin default to false
+    in_root do
+      migration = Dir.glob("db/migrate/*").max_by{ |f| File.mtime(f) }
+      gsub_file migration, /:admin/, ":admin, default: false"
+    end
+  else  
+    run 'rails g devise User'
+  end
   insert_into_file 'app/controllers/application_controller.rb', "  before_action :authenticate_user!\n", after: /exception\n/
   insert_into_file 'app/controllers/pages_controller.rb', "  skip_before_action :authenticate_user!, only: :home\n", after: /ApplicationController\n/
 end
@@ -290,26 +303,26 @@ end
 def setup_pundit
   insert_into_file 'app/controllers/application_controller.rb', before: /^end/ do
     <<-RUBY
-    def user_not_authorized
-      flash[:alert] = "You are not authorized to perform this action."
-      redirect_to(root_path)
-    end
+  def user_not_authorized
+    flash[:alert] = "You are not authorized to perform this action."
+    redirect_to(root_path)
+  end
 
-    private
+  private
 
-    def skip_pundit?
-      devise_controller? || params[:controller] =~ /(^(rails_)?admin)|(^pages$)/
-    end
+  def skip_pundit?
+    devise_controller? || params[:controller] =~ /(^(rails_)?admin)|(^pages$)/
+  end
     RUBY
   end
   insert_into_file 'app/controllers/application_controller.rb', after: /exception\n/ do
     <<-RUBY
-    include Pundit
+  include Pundit
 
-    after_action :verify_authorized, except: :index, unless: :skip_pundit?
-    after_action :verify_policy_scoped, only: :index, unless: :skip_pundit?
+  after_action :verify_authorized, except: :index, unless: :skip_pundit?
+  after_action :verify_policy_scoped, only: :index, unless: :skip_pundit?
 
-    rescue_from Pundit::NotAuthorizedError, with: :user_not_authorized
+  rescue_from Pundit::NotAuthorizedError, with: :user_not_authorized
     RUBY
   end
   run 'spring stop'
