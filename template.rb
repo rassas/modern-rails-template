@@ -182,6 +182,11 @@ end
 
 def setup_rails_admin
   generate "rails_admin:install"
+  insert_into_file 'config/initializers/rails_admin.rb', after: "RailsAdmin.config do |config|\n" do
+    <<-RUBY
+  config.included_models = ["User"]
+    RUBY
+  end
 end
 
 def setup_friendly_id
