@@ -281,7 +281,9 @@ def setup_devise
   insert_into_file 'config/routes.rb', after: /draw do\n/ do
     <<-RUBY
   require "sidekiq/web"
-  mount Sidekiq::Web => '/sidekiq'
+  authenticate :user, lambda { |u| u.admin? } do
+    mount Sidekiq::Web => '/sidekiq'
+  end
     RUBY
   end
 
