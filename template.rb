@@ -184,8 +184,20 @@ def setup_rails_admin
   generate "rails_admin:install"
   insert_into_file 'config/initializers/rails_admin.rb', after: "RailsAdmin.config do |config|\n" do
     <<-RUBY
+  config.main_app_name = [Rails.application.class.parent_name, "Admin Dashboard"]
   config.included_models = ["User"]
     RUBY
+  end
+
+  if @devise
+    insert_into_file 'config/initializers/rails_admin.rb', after: "# == Devise ==\n" do
+      <<-RUBY
+  config.authenticate_with do
+    warden.authenticate! scope: :user
+  end
+  config.current_user_method(&:current_user)
+      RUBY
+    end
   end
 end
 
