@@ -79,6 +79,7 @@ def ask_optional_options
   @devise = yes?('Do you want to implement authentication in your app with the Devise gem?')
   @pundit = yes?('Do you want to manage authorizations with Pundit?') if @devise
   @omniauth_facebook = yes?('Do you want to setup omniauth_facebook') if @devise
+  @omniauth_linkedin = yes?('Do you want to setup omniauth_linkedin') if @devise
   @omniauth_twitter = yes?('Do you want to setup omniauth_twitter') if @devise
   @omniauth_github = yes?('Do you want to setup omniauth_github') if @devise
   @uuid = yes?('Do you want to use UUID for active record primary?')
@@ -98,6 +99,7 @@ def install_optional_gems
   add_haml if @haml
   add_omniauth_facebook if @omniauth_facebook
   add_omniauth_twitter if @omniauth_twitter
+  add_omniauth_linkedin if @omniauth_linkedin
   add_omniauth_github if @omniauth_github
   add_searchkick if @searchkick
 end
@@ -108,6 +110,10 @@ end
 
 def add_omniauth_facebook
   insert_into_file 'Gemfile', "gem 'omniauth-facebook', '~> 4.0'\n", after: /'devise-i18n'\n/
+end
+
+def add_omniauth_linkedin
+  insert_into_file 'Gemfile', "gem 'omniauth-linkedin'\n", after: /'devise-i18n'\n/
 end
 
 def add_omniauth_twitter
@@ -192,7 +198,7 @@ def setup_gems
   setup_devise if @devise
   setup_pundit if @pundit
   setup_haml if @haml
-  setup_multiple_authentication if @omniauth_facebook || @omniauth_github || @omniauth_twitter
+  setup_multiple_authentication if @omniauth_facebook || @omniauth_github || @omniauth_twitter || @omniauth_linkedin
   setup_rails_admin if @rails_admin
 end
 
@@ -220,6 +226,24 @@ def setup_multiple_authentication
       <<-RUBY
     def facebook
       handle_auth "Facebook"
+    end
+
+      RUBY
+    end
+  end
+
+  if @omniauth_linkedin
+    template += """
+  if Rails.application.secrets.linkedin_app_id.present? && Rails.application.secrets.linkedin_app_secret.present?
+    config.omniauth :linkedin, Rails.application.secrets.linkedin_app_id, Rails.application.secrets.linkedin_app_secret
+  end
+
+    """
+
+    insert_into_file 'app/controllers/users/omniauth_callbacks_controller.rb', after: "attr_reader :service, :user\n" do
+      <<-RUBY
+    def linkedin
+      handle_auth "Linkedin"
     end
 
       RUBY
