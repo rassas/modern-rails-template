@@ -99,6 +99,11 @@ def install_optional_gems
   add_omniauth_facebook if @omniauth_facebook
   add_omniauth_twitter if @omniauth_twitter
   add_omniauth_github if @omniauth_github
+  add_searchkick if @searchkick
+end
+
+def add_searchkick
+  insert_into_file 'Gemfile', "\ngem 'searchkick'\n", after: /'rails-i18n'\n/
 end
 
 def add_omniauth_facebook
