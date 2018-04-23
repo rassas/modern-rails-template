@@ -34,23 +34,37 @@ group :development do
   gem 'spring'
   gem 'spring-watcher-listen'<%= gemfile_requirement('spring-watcher-listen') %>
 
+  # Annotate Rails classes with schema and routes info
   gem 'annotate'
+  # Pretty print your Ruby objects with style -- in full color and with proper indentation
   gem 'awesome_print'
+  # Help to kill N+1 queries and unused eager loading
   gem 'bullet'
+  # Generate Entity-Relationship Diagrams for Rails applications
   gem 'rails-erd'
+  # TablePrint shows objects in nicely formatted columns for easy reading.
   gem 'table_print'
+  # Press cmd+shift+x (Mac) or ctrl+shift+x to reveal an overlay of the files that rendered your UI.
   gem 'xray-rails'
+  # Extract from RailsPanel (chrome extension)
+  gem 'meta_request'
 
+  # A static analysis security vulnerability scanner for Ruby on Rails applications 
   gem 'brakeman', require: false
+  # A fully configurable and extendable Git hook manager
   gem 'overcommit'
+  # A Ruby static code analyzer.
   gem 'rubocop', require: false
 
+  # Guard is a command line tool to easily handle events on file system modifications.
   gem 'guard'
+  # Automatically install/update your gem bundle when needed
   gem 'guard-bundler', require: false
+  # Automatically reload your browser when 'view' files are modified.
   gem 'guard-livereload', require: false
   gem 'rack-livereload'
 
-  gem 'better_errors'
+  # gem 'better_errors'
   gem 'binding_of_caller'
   gem 'web-console'<%= gemfile_requirement('web-console') %>
 end
