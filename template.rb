@@ -6,13 +6,13 @@ RAILS_REQUIREMENT = ">= 5.2.0.rc1"
 
 def apply_template!
   assert_minimum_rails_version
-  add_template_repository_to_source_path
+  # add_template_repository_to_source_path
 
   # temporary fix bootsnap bug
   comment_lines 'config/boot.rb', /bootsnap/
 
   template "Gemfile.tt", force: true
-  template 'README.md.tt', force: true
+  # template 'README.md.tt', force: true
   apply 'config/template.rb'
   apply 'app/template.rb'
   copy_file 'Procfile'
@@ -55,19 +55,19 @@ end
 # copy_file and template resolve against our source files. If this file was
 # invoked remotely via HTTP, that means the files are not present locally.
 # In that case, use `git clone` to download them to a local temporary dir.
-def add_template_repository_to_source_path
-  if __FILE__ =~ %r{\Ahttps?://}
-    source_paths.unshift(tempdir = Dir.mktmpdir("rails-template-"))
-    at_exit { FileUtils.remove_entry(tempdir) }
-    git :clone => [
-      "--quiet",
-      "https://github.com/damienlethiec/modern-rails-template",
-      tempdir
-    ].map(&:shellescape).join(" ")
-  else
-    source_paths.unshift(File.dirname(__FILE__))
-  end
-end
+# def add_template_repository_to_source_path
+#   if __FILE__ =~ %r{\Ahttps?://}
+#     source_paths.unshift(tempdir = Dir.mktmpdir("rails-template-"))
+#     at_exit { FileUtils.remove_entry(tempdir) }
+#     git :clone => [
+#       "--quiet",
+#       "https://github.com/damienlethiec/modern-rails-template",
+#       tempdir
+#     ].map(&:shellescape).join(" ")
+#   else
+#     source_paths.unshift(File.dirname(__FILE__))
+#   end
+# end
 
 def gemfile_requirement(name)
   @original_gemfile ||= IO.read("Gemfile")
@@ -75,17 +75,19 @@ def gemfile_requirement(name)
   req && req.gsub("'", %(")).strip.sub(/^,\s*"/, ', "')
 end
 
-
-
 def ask_optional_options
   @devise = yes?('Do you want to implement authentication in your app with the Devise gem?')
   @pundit = yes?('Do you want to manage authorizations with Pundit?') if @devise
+  @omniauth_facebook = yes?('Do you want to setup omniauth_facebook') if @devise
+  @omniauth_twitter = yes?('Do you want to setup omniauth_twitter') if @devise
+  @omniauth_github = yes?('Do you want to setup omniauth_github') if @devise
   @uuid = yes?('Do you want to use UUID for active record primary?')
   @haml = yes?('Do you want to use Haml instead of EBR?')
   @komponent = yes?('Do you want to adopt a component based design for your front-end?')
   @tailwind = yes?('Do you want to use Tailwind as a CSS framework?')
   @github = yes?('Do you want to push your project to Github?')
-  @rails_admin = yes?('Do you want to setup rails_admin')
+  @rails_admin = yes?('Do you want to setup rails_admin?')
+  @searchkick = yes?('Do you want to setup Elasticsearch with Searchkick?')
 end
 
 def install_optional_gems
@@ -94,19 +96,34 @@ def install_optional_gems
   add_pundit if @pundit
   add_komponent if @komponent
   add_haml if @haml
+  add_omniauth_facebook if @omniauth_facebook
+  add_omniauth_twitter if @omniauth_twitter
+  add_omniauth_github if @omniauth_github
+end
+
+def add_omniauth_facebook
+  insert_into_file 'Gemfile', "gem 'omniauth-facebook', '~> 4.0'\n", after: /'devise-i18n'\n/
+end
+
+def add_omniauth_twitter
+  insert_into_file 'Gemfile', "gem 'omniauth-twitter', '~> 1.4'\n", after: /'devise-i18n'\n/
+end
+
+def add_omniauth_github
+  insert_into_file 'Gemfile', "ngem 'omniauth-github', '~> 1.3'\n", after: /'devise-i18n'\n/
 end
 
 def add_rails_admin
-  insert_into_file 'Gemfile', "\ngem 'rails_admin', '~> 1.3'\n", after: /rails-i18n'\n/
+  insert_into_file 'Gemfile', "\ngem 'rails_admin', '~> 1.3'\n", after: /'rails-i18n'\n/
 end
 
 def add_devise
-  insert_into_file 'Gemfile', "gem 'devise'\n", after: /'friendly_id'\n/
-  insert_into_file 'Gemfile', "gem 'devise-i18n'\n", after: /'friendly_id'\n/
+  insert_into_file 'Gemfile', "\n gem 'devise'\n", after: /'friendly_id'\n/
+  insert_into_file 'Gemfile', "gem 'devise-i18n'\n", after: /'devise'\n/
 end
 
 def add_pundit
-  insert_into_file 'Gemfile', "gem 'pundit'\n", after: /'friendly_id'\n/
+  insert_into_file 'Gemfile', "\ngem 'pundit'\n", after: /'friendly_id'\n/
 end
 
 def add_haml
@@ -118,14 +135,10 @@ def add_komponent
   insert_into_file 'Gemfile', "gem 'komponent'\n", after: /'friendly_id'\n/
 end
 
-
-
 def setup_uuid
   copy_file 'db/migrate/20180208061510_enable_pg_crypto_extension.rb'
   insert_into_file 'config/initializers/generators.rb', "  g.orm :active_record, primary_key_type: :uuid\n", after: /assets: false\n/
 end
-
-
 
 def setup_front_end
   copy_file '.browserslistrc'
@@ -161,8 +174,6 @@ def add_css_framework
   end
 end
 
-
-
 def setup_gems
   setup_friendly_id
   setup_annotate
@@ -176,8 +187,78 @@ def setup_gems
   setup_devise if @devise
   setup_pundit if @pundit
   setup_haml if @haml
-
+  setup_multiple_authentication if @omniauth_facebook || @omniauth_github || @omniauth_twitter
   setup_rails_admin if @rails_admin
+end
+
+def setup_multiple_authentication
+  # Add Devise omniauthable to users
+  inject_into_file("app/models/user.rb", "omniauthable, :", after: "devise :")
+  copy_file 'app/controllers/users/omniauth_callbacks_controller.rb'
+  insert_into_file "config/routes.rb",
+    ', controllers: { omniauth_callbacks: "users/omniauth_callbacks" }',
+    after: "  devise_for :users"
+
+  generate "model Service user:references provider uid access_token access_token_secret refresh_token expires_at:datetime auth:text"
+
+  template = ""
+
+  if @omniauth_facebook
+    template += """
+  if Rails.application.secrets.facebook_app_id.present? && Rails.application.secrets.facebook_app_secret.present?
+    config.omniauth :facebook, Rails.application.secrets.facebook_app_id, Rails.application.secrets.facebook_app_secret, scope: 'email,user_posts'
+  end
+
+    """
+
+    insert_into_file 'app/controllers/users/omniauth_callbacks_controller.rb', after: "attr_reader :service, :user\n" do
+      <<-RUBY
+    def facebook
+      handle_auth "Facebook"
+    end
+
+      RUBY
+    end
+  end
+
+  if @omniauth_twitter
+    template += """
+  if Rails.application.secrets.twitter_app_id.present? && Rails.application.secrets.twitter_app_secret.present?
+    config.omniauth :twitter, Rails.application.secrets.twitter_app_id, Rails.application.secrets.twitter_app_secret
+  end
+
+    """
+
+    insert_into_file 'app/controllers/users/omniauth_callbacks_controller.rb', after: "attr_reader :service, :user\n" do
+      <<-RUBY
+    def twitter
+      handle_auth "Twitter"
+    end
+      RUBY
+    end
+  end
+
+  if @omniauth_github
+    template += """
+  if Rails.application.secrets.github_app_id.present? && Rails.application.secrets.github_app_secret.present?
+    config.omniauth :github, Rails.application.secrets.github_app_id, Rails.application.secrets.github_app_secret
+  end
+
+    """
+
+    insert_into_file 'app/controllers/users/omniauth_callbacks_controller.rb', after: "attr_reader :service, :user\n" do
+      <<-RUBY
+    def github
+      handle_auth "Github"
+    end
+    
+      RUBY
+    end
+  end
+
+  insert_into_file "config/initializers/devise.rb",
+    "  " + template + "\n\n",
+    before: "  # ==> Warden configuration"
 end
 
 def setup_rails_admin
